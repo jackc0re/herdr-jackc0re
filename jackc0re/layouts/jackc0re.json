@@ -23,6 +23,29 @@
           "window_drag": true
         },
         {
+          "id": "machine-vitals",
+          "type": "block",
+          "content": {
+            "mod": "machine-vitals"
+          },
+          "size": {
+            "px": 100
+          }
+        },
+        {
+          "id": "claude-limits",
+          "type": "block",
+          "content": {
+            "mod": "claude-status",
+            "props": {
+              "part": "limits"
+            }
+          },
+          "size": {
+            "px": 80
+          }
+        },
+        {
           "id": "sidebar-lists",
           "type": "column",
           "children": [
@@ -80,7 +103,7 @@
           "id": "tabs",
           "type": "block",
           "content": {
-            "mod": "tabs"
+            "mod": "jackc0re-tabs"
           },
           "size": {
             "px": 42
@@ -141,9 +164,34 @@
                       "content": {
                         "mod": "changes"
                       }
+                    },
+                    {
+                      "id": "tab-notes",
+                      "type": "block",
+                      "content": {
+                        "mod": "tab-notes"
+                      }
                     }
                   ],
-                  "active": "files"
+                  "active": "files",
+                  "size": {
+                    "weight": 7
+                  }
+                },
+                {
+                  "id": "claude-session",
+                  "type": "block",
+                  "size": {
+                    "weight": 3
+                  },
+                  "min": 300,
+                  "content": {
+                    "mod": "claude-status",
+                    "props": {
+                      "part": "session",
+                      "block": "claude-session"
+                    }
+                  }
                 }
               ],
               "size": {
@@ -151,7 +199,8 @@
               },
               "min": 280,
               "max": 900,
-              "hidden": true
+              "hidden": true,
+              "gap": 8
             }
           ],
           "padding": 8,

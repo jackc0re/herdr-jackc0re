@@ -6,13 +6,33 @@ cards, each with a small ASCII critter whose face and motion follow the agent's
 status: it glances around while working, shakes when it needs you, cheers when
 it's done and snoozes when idle.
 
+The sidebar also opens with this PC's vitals and your Claude subscription limits,
+and the right panel has per-tab Notes plus a live Claude Code session card
+(adapted for Windows and the jackc0re look from ozcberkay's
+[Herdr Çoban](https://github.com/ozcberkay/herdr-coban)).
+
 ![jackc0re](preview.png)
 
 ## What you see
 
-- **Whole window:** the shipped `main` layout, unchanged in structure. A 268px
-  sidebar on the left (brand bar, Spaces, Agents, footer). The tab bar, panes as
-  cards, Files/Changes panels and the status bar sit on the right.
+- **Whole window:** the shipped `main` layout plus Çoban's extra blocks. A
+  268px sidebar on the left: brand bar (46px), **THIS PC** (100px), **CLAUDE**
+  (80px), Spaces and Agents (one weight each), footer (69px). On the right: the
+  tab bar (42px) with **Files**, **Changes** and **Notes** buttons, panes as
+  cards, the side panel (368px, 280–900) and the status bar (28px).
+- **Section labels:** THIS PC, CLAUDE, NOTES and CLAUDE CODE use the same 11px
+  bold uppercase JetBrains Mono, `dim`, as the AGENTS header. Row labels (CPU,
+  MEM, DISK, 5H, 7D) are 10px bold mono, values 10.5px mono.
+- **THIS PC:** a CPU sparkline (24 samples, 2 minutes), a memory bar, the system
+  drive's bar with free GB, and a battery line when the PC has one. Bars fill
+  `accent`, turning `ansi3` at 85% and `ansi1` at 95% (disk: 90%). Memory turns
+  yellow at 80% and red at 92% of RAM or commit.
+- **CLAUDE:** a 5H and a 7D bar with a 2px `foreground` mark for how much of
+  the window has passed, the used percentage and the time to the reset. Yellow
+  at 70% used or a pace of 85%, red at 90% used or a pace of 100%.
+- **Side panel:** a stack of Files, Changes and Notes (7 weights) over the
+  CLAUDE CODE card (3 weights, min 300px): model and effort chips, context bar,
+  cost/time/lines tiles, prompt cache, status-line badges.
 - **Theme `jackc0re`:** terminal background `#212124`, terminal text `#B8B8B8`,
   cursor `#cd974b`. Sidebars and bars (`chrome`/`surface`) are `#262629`, popups
   `#2A2A2E`, behind the cards (`canvas`) `#1c1c1f`. Hover and selected are
@@ -59,6 +79,25 @@ it's done and snoozes when idle.
 
 ## Built from
 
+- `layouts/jackc0re.json` sidebar: `brand`, `machine-vitals`
+  (`{"px":100}`), `claude-limits` (`claude-status`, props `{"part":"limits"}`,
+  `{"px":80}`), `sidebar-lists`, `sidebar-footer`. `tabs` block uses
+  `jackc0re-tabs`. `panel` column (`gap: 8`): `panel-body` stack (weight 7:
+  `files`, `changes`, `tab-notes`) and `claude-session` (`claude-status`, props
+  `{"part":"session","block":"claude-session"}`, weight 3, min 300).
+- `mods/jackc0re-tabs/`: a `mod.clone` of the shipped `tabs` (0.1.16) with a
+  Notes panel button (`mods/tab-notes/notes.svg`), `"tab-notes"` added to the
+  remembered panels, and `layout.show {id:"claude-session"}` once in `init` so
+  that hidden block's mod starts.
+- `mods/machine-vitals/`: Çoban's mod with `stats.js` rewritten for Windows:
+  one `pwsh -NoProfile -Command` call (fallback `powershell`) reading CIM
+  (`Win32_PerfFormattedData_PerfOS_Processor`, `Win32_OperatingSystem`,
+  `Win32_LogicalDisk`, `Win32_Battery`) as JSON, every 5s in front / 30s
+  behind. Click opens `taskmgr`.
+- `mods/claude-status/`, `mods/tab-notes/`: Çoban's mods; `shortPath` handles
+  Windows paths, links open with `explorer`. Data comes from `statusline.sh`
+  via Claude Code's `statusLine` (see the README).
+
 - `layouts/jackc0re.json`: a `layout.clone` of `main` with root
   `"theme": "jackc0re"` and the `agents` block's content changed to
   `{ "mod": "critters" }`. Everything else uses shipped mods: `workspace-chrome`,
@@ -88,7 +127,24 @@ it's done and snoozes when idle.
 - Herdr's shipped layouts and mods are replaced on every start, so this has to
   be a cloned layout plus a cloned mod, not an edit of `agents`.
 
+- `machine-vitals` is Windows-only now (the original is macOS-only). It runs
+  PowerShell; `claude-status` reads files under `~/.config/herdr-app/claude-status/`
+  and `tab-notes` writes `~/.config/herdr-app/tab-notes/`.
+- Without the `statusLine` setting the CLAUDE panels say "No usage yet". To
+  uninstall, remove the `statusLine` first, then the files.
+- `jackc0re-tabs` is a frozen clone of `tabs`: re-clone and redo the Notes
+  changes if a Herdr update breaks the tab bar.
+- Çoban's mods are Apache-2.0 (`mods/LICENSE-herdr-coban`); Lucide icons
+  carry `LICENSE-lucide`.
+
 ## Done when
+
+- `herdr-app check` passes for `critters`, `jackc0re-tabs`, `machine-vitals`,
+  `claude-status` and `tab-notes`.
+- THIS PC shows CPU, memory and disk; CLAUDE shows the 5H and 7D bars after a
+  Claude Code response.
+- The Notes button opens the shown tab's note; a tab running Claude Code shows
+  the CLAUDE CODE card under it.
 
 - `herdr-app check mods/critters` passes.
 - `herdr-app do layout.switch --name jackc0re` shows the charcoal/amber theme
