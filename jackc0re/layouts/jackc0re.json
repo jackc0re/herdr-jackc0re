@@ -53,7 +53,7 @@
               "id": "spaces",
               "type": "block",
               "content": {
-                "mod": "spaces"
+                "mod": "jackc0re-spaces"
               },
               "size": {
                 "weight": 1
@@ -72,6 +72,16 @@
               "min": 90
             }
           ]
+        },
+        {
+          "id": "wsl",
+          "type": "block",
+          "content": {
+            "mod": "wsl"
+          },
+          "size": {
+            "px": 34
+          }
         },
         {
           "id": "sidebar-footer",

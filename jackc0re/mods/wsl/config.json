@@ -1,0 +1,4 @@
+{
+  "machine": "wsl",
+  "distro": "NixOS"
+}

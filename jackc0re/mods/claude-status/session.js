@@ -14,6 +14,10 @@ const TICK = 500; // ms: how fast the block follows the shown tab
 const READ_EVERY = 4; // ticks between reads of the shown session's file
 const CLEAN_EVERY = 120; // ticks between removals of files of ended terminals
 
+// jackc0re: a terminal on another machine ("wsl/t1") keeps its files as "wsl-t1";
+// that machine's status line sets HC_TERMINAL_ID=wsl-<id> (see the README).
+const fileId = (addr) => (typeof addr === "string" ? addr.replace("/", "-") : addr);
+
 const isClaude = (p) => p.app === "claude-code" || p.program?.key === "claude";
 
 export default class Session {
@@ -59,12 +63,12 @@ export default class Session {
   }
 
   read(cx) {
-    const id = this.pane?.terminal;
+    const id = fileId(this.pane?.terminal);
     if (!safeId(id)) return;
     cx.spawn(async (cx) => {
       try {
         const [json, line] = await Promise.all([readTextFile(`${DIR()}/${id}.json`), readTextFile(`${DIR()}/${id}.line`)]);
-        if (this.pane?.terminal !== id) return;
+        if (fileId(this.pane?.terminal) !== id) return;
         this.data = json ? JSON.parse(json) : null;
         this.line = line ?? "";
         this.error = null;
@@ -78,7 +82,10 @@ export default class Session {
   // Files of terminals that no longer exist on this computer. Only judged while
   // the core lists terminals, so a core that is not answering never loses files.
   clean(cx) {
-    const live = new Set(terminals().map((t) => t.address).filter((a) => typeof a === "string" && !a.includes("/")));
+    const addrs = terminals().map((t) => t.address).filter((a) => typeof a === "string");
+    const live = new Set(addrs.map(fileId));
+    // Only judge machines that list terminals now, so an offline one never loses files.
+    const listing = new Set(addrs.map((a) => (a.includes("/") ? a.split("/")[0] : "")));
     if (live.size === 0) return;
     cx.spawn(async () => {
       try {
@@ -86,7 +93,8 @@ export default class Session {
           // Only the files statusline.sh writes: `<terminal>.json`, `<terminal>.line`, and
           // `<terminal>.<ext>.tmp.<pid>` when Claude Code stopped a status line halfway.
           const m = name.match(/^([A-Za-z0-9_-]{1,64})\.(json|line)(\.tmp\.\d+)?$/);
-          if (m && (m[3] || !live.has(m[1]))) await fs.unlink(`${DIR()}/${name}`).catch(() => {});
+          const owner = /^[A-Za-z0-9_]+-t\d+$/.test(m?.[1] ?? "") ? m[1].split("-")[0] : "";
+          if (m && (m[3] || (listing.has(owner) && !live.has(m[1])))) await fs.unlink(`${DIR()}/${name}`).catch(() => {});
         }
       } catch {}
     });
@@ -119,7 +127,7 @@ export default class Session {
       .when(Boolean(s?.effort?.level), (el) => el.child(chip(s.effort.level, null, "cs-effort").tooltip("Reasoning effort")));
 
     const note = (text) => div().p(14).text_size(12).text_color(t.dim).child(text);
-    if (!safeId(p.terminal)) return panel.child(header).child(note("Session details are only kept for agents on this computer."));
+    if (!safeId(fileId(p.terminal))) return panel.child(header).child(note("No session details for this terminal."));
     if (this.error) return panel.child(header).child(div().p(14).text_size(12).text_color(t.ansi1).child(this.error));
     if (!s) return panel.child(header).child(note(this.data === null
       ? "Waiting for the first response of this session. Connect the Claude Code status line to statusline.sh in the claude-status mod folder if nothing comes."
