@@ -1,6 +1,5 @@
 {
   "id": "root",
-  "theme": "jackc0re",
   "cloned_from": {
     "name": "main",
     "version": "0.1.16"
@@ -40,6 +39,16 @@
             "props": {
               "part": "limits"
             }
+          },
+          "size": {
+            "px": 80
+          }
+        },
+        {
+          "id": "codex-limits",
+          "type": "block",
+          "content": {
+            "mod": "codex-status"
           },
           "size": {
             "px": 80
@@ -162,10 +171,10 @@
                   "type": "stack",
                   "children": [
                     {
-                      "id": "files",
+                      "id": "files-remote",
                       "type": "block",
                       "content": {
-                        "mod": "files"
+                        "mod": "filetree"
                       }
                     },
                     {
@@ -181,9 +190,19 @@
                       "content": {
                         "mod": "tab-notes"
                       }
+                    },
+                    {
+                      "id": "blueprint",
+                      "type": "block",
+                      "content": {
+                        "mod": "blueprint",
+                        "props": {
+                          "panel": true
+                        }
+                      }
                     }
                   ],
-                  "active": "files",
+                  "active": "files-remote",
                   "size": {
                     "weight": 7
                   }
@@ -191,21 +210,21 @@
                 {
                   "id": "claude-session",
                   "type": "block",
-                  "size": {
-                    "weight": 3
-                  },
-                  "min": 300,
                   "content": {
                     "mod": "claude-status",
                     "props": {
                       "part": "session",
                       "block": "claude-session"
                     }
-                  }
+                  },
+                  "size": {
+                    "weight": 3
+                  },
+                  "min": 300
                 }
               ],
               "size": {
-                "px": 368
+                "px": 300
               },
               "min": 280,
               "max": 900,
@@ -231,6 +250,7 @@
     }
   ],
   "background": "canvas",
+  "theme": "jackc0re",
   "terminal_padding": [
     14,
     12

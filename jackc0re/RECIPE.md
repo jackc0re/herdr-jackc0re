@@ -30,9 +30,18 @@ and the right panel has per-tab Notes plus a live Claude Code session card
 - **CLAUDE:** a 5H and a 7D bar with a 2px `foreground` mark for how much of
   the window has passed, the used percentage and the time to the reset. Yellow
   at 70% used or a pace of 85%, red at 90% used or a pace of 100%.
-- **Side panel:** a stack of Files, Changes and Notes (7 weights) over the
-  CLAUDE CODE card (3 weights, min 300px): model and effort chips, context bar,
-  cost/time/lines tiles, prompt cache, status-line badges.
+- **CODEX:** under CLAUDE, the same two bars for Codex's 5H and 7D windows, with
+  the age of the report (`now`, `5m ago`) in the header.
+- **Side panel:** a stack of Files, Changes, Notes and Blueprint (7 weights) over
+  the session card (3 weights, min 300px). For Claude Code: model and effort
+  chips, context bar, cost/time/lines tiles, prompt cache, status-line badges.
+  For Codex or Pi (header `CODEX` / `PI`): model and effort chips, context bar
+  against the model's window, Cost (Pi's estimate; `plan` for Codex), Time and
+  Tokens tiles, and the share of input served from cache. Below, `SUB-AGENTS N`:
+  one card per agent the tab started (name, status dot or spinner, model, cost or
+  tokens, a 4px context bar with its percentage).
+- **Files:** a file tree with git status, a branch row and search, on this
+  computer and on other machines (WSL, ssh) alike.
 - **Theme `jackc0re`:** terminal background `#212124`, terminal text `#B8B8B8`,
   cursor `#cd974b`. Sidebars and bars (`chrome`/`surface`) are `#262629`, popups
   `#2A2A2E`, behind the cards (`canvas`) `#1c1c1f`. Hover and selected are
@@ -76,6 +85,16 @@ and the right panel has per-tab Notes plus a live Claude Code session card
   chevron, exactly as in the shipped agents list.
 - Sorting (priority / grouped by space), pinning, the narrow rail and
   `setAgentOrder` all behave as in the shipped `agents` mod.
+- Files: a click on a file selects it. Double-click or Enter opens it in the
+  tab's nvim: the first time an nvim pane starts right of the focused pane, on
+  the space's machine, with `--listen` (a named pipe
+  `\\.\pipe\herdr-filetree-<tab>` on Windows, `/tmp/herdr-filetree-<tab>.sock`
+  elsewhere); later files go to it with `nvim --server … --remote` and focus it.
+  `alt-e` (`jackc0re-tabs.toggle-files`) opens and closes the panel.
+- The session card follows the focused tab: its focused agent pane, else the one
+  shown last, else the first. It hides itself in tabs with no agent and no
+  sub-agents. Clicking the header focuses the agent's pane; clicking a sub-agent
+  card peeks at it (`terminal.peek`).
 
 ## Built from
 
@@ -97,6 +116,28 @@ and the right panel has per-tab Notes plus a live Claude Code session card
 - `mods/claude-status/`, `mods/tab-notes/`: Çoban's mods; `shortPath` handles
   Windows paths, links open with `explorer`. Data comes from `statusline.sh`
   via Claude Code's `statusLine` (see the README).
+- `codex-limits` block (`codex-status`): every 45s, and on a `watchFolder` of the
+  local `~/.codex/sessions`, it reads the last `rate_limits` lines of the newest
+  rollout on this computer (PowerShell on Windows, `sh` elsewhere) and on every
+  machine in `machines()` (`exec("sh", …, {on})`), and shows the newest report.
+  Only `limit_id` `codex` counts.
+- `mods/claude-status/agentlog.js`: Codex and Pi sessions, read with `sh` on the
+  agent's machine. Codex: `~/.codex/sessions/*/*/*/rollout-*.jsonl`, the last
+  `total_token_usage` event (`last_token_usage.total_tokens` over
+  `model_context_window`) and `turn_context` (model, effort). Pi:
+  `~/.pi/agent/sessions/--<cwd with / as ->--/<start>_<id>.jsonl`, summing every
+  `usage.cost.total`; the last usage is the context; the window and model name
+  come from `~/.pi/agent/models-store.json` (pretty-printed: `"id": "…"`).
+  Logs don't name their terminal: a terminal (start time from `hc get --json`
+  `created_ms`) gets the first session that started in its folder after it,
+  moving to a later one only if the current one was last written before the
+  later one started (`/new`). Sub-agents: live terminals whose `parent` chain
+  leads to a terminal of the tab.
+- `mods/filetree/`: cybertron288's filetree (MIT) with `openNvim` added;
+  `config.json` `"open": "nvim"`. In the layout it is the `files-remote` stack
+  child, and `jackc0re-tabs` maps its Files button to that slot.
+- `mods/blueprint/`: chappse6's Blueprint, as-is, as the `blueprint` stack child
+  with props `{"panel": true}`.
 
 - `layouts/jackc0re.json`: a `layout.clone` of `main` with root
   `"theme": "jackc0re"` and the `agents` block's content changed to
@@ -135,7 +176,17 @@ and the right panel has per-tab Notes plus a live Claude Code session card
 - `jackc0re-tabs` is a frozen clone of `tabs`: re-clone and redo the Notes
   changes if a Herdr update breaks the tab bar.
 - Çoban's mods are Apache-2.0 (`mods/LICENSE-herdr-coban`); Lucide icons
-  carry `LICENSE-lucide`.
+  carry `LICENSE-lucide`. filetree and Blueprint are MIT (their LICENSE files
+  are in their folders).
+- Escapes in shell scripts held in JS template literals: grep's `\|` must be
+  written `\\|`, or JS turns it into `|` and the alternation silently matches
+  nothing.
+- On Windows, `nvim --server … --remote-expr 1` prints terminal codes around the
+  answer: test the exit code (0 = an nvim is listening, 2 = none), not stdout.
+- Codex logs carry no prices (it bills the ChatGPT plan), so its Cost says
+  `plan`. Pi's cost is per session; a provider's daily total also counts other
+  sessions and Pi's in-process sub-agents.
+- Codex/Pi details need `sh` on the agent's machine (Git Bash's on Windows).
 
 ## Done when
 
@@ -145,6 +196,13 @@ and the right panel has per-tab Notes plus a live Claude Code session card
   Claude Code response.
 - The Notes button opens the shown tab's note; a tab running Claude Code shows
   the CLAUDE CODE card under it.
+- CODEX shows the same 5H/7D numbers as `/status` in a running Codex, wherever
+  Codex runs (WSL included).
+- A tab running Codex or Pi shows its card with the model the agent itself
+  reports; Pi's cost and context match Pi's own status line. A tab whose agent
+  ran `hc run` shows those agents under SUB-AGENTS.
+- Files lists a WSL space's folder; double-clicking a file opens nvim on the
+  right, and a second file opens in the same nvim.
 
 - `herdr-app check mods/critters` passes.
 - `herdr-app do layout.switch --name jackc0re` shows the charcoal/amber theme

@@ -1,6 +1,6 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, ScrollHandle } from "gpui-base";
-import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings, checking } from "herdr";
+import { spaces, panes, run, openOverlay, theme, window, shared, layout, settings, checking, nextCommand } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -10,6 +10,14 @@ function find(node, id) {
   }
   return null;
 }
+
+// Files is filetree ("files-remote" slot) on every machine: the tree first, and a
+// double-click opens the file in nvim on the right. herdr-nvim's own tree stays in the
+// layout's "files" slot, unused; to go back to it, return "files" here for local spaces.
+// The button and the per-space memory speak of "files" for both.
+const filesFor = (_space) => "files-remote";
+const norm = (id) => (id === "files-remote" ? "files" : id);
+const slotFor = (id, space = spaces().find(p => p.active)) => (id === "files" ? filesFor(space) : id);
 
 // Same as the agents mod: drops a status glyph, keeps a leading bracket or quote.
 const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}\p{Ps}\p{Pi}]+/u, "").replace(/^\[ [!.] \] /, "").trim();
@@ -28,7 +36,7 @@ function label(tab, lead) {
 }
 
 export default class Tabs extends View {
-  init() {
+  init(_props, cx) {
     // A hidden block's mod starts only once shown: show the Claude session block once so
     // its mod starts and from then on hides/shows itself with the shown tab.
     if (!checking()) run("layout.show", { id: "claude-session" });
@@ -37,6 +45,17 @@ export default class Tabs extends View {
     try { this.panels = JSON.parse(localStorage.getItem("panels") ?? "{}"); } catch { this.panels = {}; }
     if (!this.panels || typeof this.panels !== "object" || Array.isArray(this.panels)) this.panels = {};
     this.swipe = { acc: 0, steps: 0, at: 0, last: 0 };
+    // "jackc0re-tabs.toggle-<id>" from keys.json: show that side panel, or hide it if it's showing.
+    if (!checking()) cx.spawn(async () => {
+      for (;;) {
+        const c = String(await nextCommand());
+        const id = c.startsWith("toggle-") ? c.slice(7) : null;
+        if (!id) continue;
+        const root = layout(), panel = find(root, "panel"), body = find(root, "panel-body");
+        if (panel && !panel.hidden && norm(body?.active) === id) run("layout.hide", { id: "panel" });
+        else { run("layout.select", { stack: "panel-body", child: slotFor(id) }); run("layout.show", { id: "panel" }); }
+      }
+    });
   }
 
   // One tab per wheel notch. A touchpad or smooth-scrolling mouse sends many
@@ -66,7 +85,7 @@ export default class Tabs extends View {
   // (closed if it never had one), and opening or closing it records it.
   syncPanel(space, panel, body, enabled) {
     if (!space || !panel) return;
-    const now = panel.hidden ? null : body?.active ?? null;
+    const now = panel.hidden ? null : norm(body?.active ?? null);
     if (space.id !== this.space) {
       const first = this.space === undefined;
       this.space = space.id; this.pending = null;
@@ -74,7 +93,7 @@ export default class Tabs extends View {
         const stored = this.panels[space.id] ?? null, want = enabled.includes(stored) ? stored : null;
         if (want !== now) {
           this.pending = { want, until: Date.now() + 1000 };
-          if (want) { run("layout.select", { stack: "panel-body", child: want }); run("layout.show", { id: "panel" }); }
+          if (want) { run("layout.select", { stack: "panel-body", child: slotFor(want, space) }); run("layout.show", { id: "panel" }); }
           else run("layout.hide", { id: "panel" });
           return;
         }
@@ -85,6 +104,8 @@ export default class Tabs extends View {
       if (this.pending.want !== now && Date.now() < this.pending.until) return;
       this.pending = null;
     }
+    // Files open on the wrong slot for this space's machine: swap to the right one.
+    if (now === "files" && body?.active !== filesFor(space)) run("layout.select", { stack: "panel-body", child: filesFor(space) });
     if (this.panels[space.id] === now) return;
     this.panels[space.id] = now;
     localStorage.setItem("panels", JSON.stringify(this.panels));
@@ -133,16 +154,16 @@ export default class Tabs extends View {
       : 10;
     const panel = find(root, "panel"), body = find(root, "panel-body");
     // jackc0re: Notes always joins Files and Changes.
-    const enabled = [...(shared("workspace.panels") ?? ["files", "changes"]), "tab-notes"];
+    const enabled = [...(shared("workspace.panels") ?? ["files", "changes"]), "tab-notes", "blueprint"];
     this.syncPanel(space, panel, body, enabled);
     const panelButton = (id, label, icon) => {
-      const on = panel && !panel.hidden && body?.active === id;
+      const on = panel && !panel.hidden && norm(body?.active) === id;
       return h_flex().id(`panel-${id}`).h(26).px(8).gap(5).flex_none().items_center().rounded(6)
         .text_size(12).bg(on ? t.selected : t.chrome).text_color(on ? t.foreground : t.muted)
         .hover(s => s.bg(t.hover)).on_mouse_down("left", stop)
         .on_click(() => {
           if (on) run("layout.hide", { id: "panel" });
-          else { run("layout.select", { stack: "panel-body", child: id }); run("layout.show", { id: "panel" }); }
+          else { run("layout.select", { stack: "panel-body", child: slotFor(id, space) }); run("layout.show", { id: "panel" }); }
         }).child(svg(icon).size(14)).child(label);
     };
     return h_flex().size_full().min_w(0).px(10).pl(lightsPadding).gap(3).items_center().bg(t.chrome).border_b(1).border_color(t.border)
@@ -155,6 +176,7 @@ export default class Tabs extends View {
       .when(enabled.includes("files"), el => el.child(panelButton("files", "Files", "mods/files/file.svg")))
       .when(enabled.includes("changes"), el => el.child(panelButton("changes", "Changes", "mods/changes/changes.svg")))
       .child(panelButton("tab-notes", "Notes", "mods/tab-notes/notes.svg"))
+      .child(panelButton("blueprint", "Blueprint", "mods/blueprint/icon.svg"))
       .when(w?.buttons, el => el.child(button("minimize", w.platform === "windows" ? svg("mods/jackc0re-tabs/win-min.svg").size(16) : "−", () => run("window.minimize")))
         .child(button("maximize", w.platform === "windows" ? svg(`mods/jackc0re-tabs/${w.maximized ? "win-restore" : "win-max"}.svg`).size(16) : "□", () => run("window.maximize")))
         .child(button("close-window", w.platform === "windows" ? svg("mods/jackc0re-tabs/win-close.svg").size(16) : svg("mods/pane/close.svg").size(13), () => run("window.close"))));

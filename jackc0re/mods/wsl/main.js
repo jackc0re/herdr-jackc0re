@@ -66,6 +66,12 @@ export default class Wsl extends View {
         const c = await nextCommand();
         if (c === "new-space") this.newSpace();
         if (c === "reconnect") this.wake(cx, true);
+        // jackc0re: ctrl-alt-N -> the Nth space on the WSL machine (sidebar order).
+        const n = /^space-([1-9])$/.exec(c ?? "");
+        if (n) {
+          const target = spaces().filter((s) => s.machine === this.machine)[Number(n[1]) - 1];
+          if (target) run("space.select", { id: target.id });
+        }
         cx.notify();
       }
     });

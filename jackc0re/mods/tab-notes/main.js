@@ -26,6 +26,9 @@ export default class Notes extends View {
   init(_props, cx) {
     this.tab = null; this.editor = null; this.dirty = false; this.gen = 0;
     this.pending = Promise.resolve(); this.known = new Set(); this.unsaved = new Map();
+    // Editors replaced since the last render: the frame on screen may still draw them, so
+    // they are released only once a newer render has returned a tree without them.
+    this.retired = []; this.drawnRetired = [];
     cx.timer.every(800, cx => this.flush(cx));
   }
 
@@ -53,7 +56,8 @@ export default class Notes extends View {
 
   open(id, cx) {
     this.flush(cx);
-    this.editor?.release(); this.editor = null; this.tab = id; this.error = null; this.dirty = false;
+    if (this.editor) this.retired.push(this.editor);
+    this.editor = null; this.tab = id; this.error = null; this.dirty = false;
     if (!id) return;
     const gen = ++this.gen;
     cx.spawn(async cx => {
@@ -96,6 +100,10 @@ export default class Notes extends View {
   }
 
   render(cx) {
+    // Retired before the previous render, so that render's tree (now being replaced) was the
+    // last that could hold them. Ones retired since wait for the next render.
+    for (const e of this.drawnRetired) { try { e.release(); } catch {} }
+    this.drawnRetired = this.retired; this.retired = [];
     const tab = activeTab();
     if ((tab?.id ?? null) !== this.tab) this.open(tab?.id ?? null, cx);
     const seen = JSON.stringify([machines(), spaces().map(s => s.tabs.map(t => t.id))]);
